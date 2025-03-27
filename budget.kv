@@ -1,0 +1,132 @@
+# budget.kv
+#:import dp kivy.metrics.dp
+
+# Define a simple TextInput for numeric input (basic version)
+<NumericInput@TextInput>:
+    input_filter: 'float'
+    multiline: False
+    write_tab: False # Important for focus traversal
+
+# Define the Screen Manager rule (optional if defined in Python)
+<MyScreenManager>:
+    AccountsScreen:
+        name: 'accounts'
+    BudgetScreen:
+        name: 'budget'
+
+<AccountsScreen>:
+    # Give Python access to these widgets
+    snapshot_status_label: snapshot_status_id
+    account_list_layout: account_list_id # ID for the GridLayout
+
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(10)
+        spacing: dp(10)
+
+        Label:
+            text: 'Accounts & Balances for Snapshot'
+            font_size: '24sp'
+            size_hint_y: None
+            height: dp(40)
+
+        # Header for the account list
+        BoxLayout:
+            size_hint_y: None
+            height: dp(30)
+            Label:
+                text: 'Account Name'
+                halign: 'left'
+                text_size: self.size
+            Label:
+                text: 'Current Balance'
+                halign: 'right'
+                text_size: self.size
+                size_hint_x: 0.4 # Give balance column less space
+
+        ScrollView:
+            # This GridLayout will be populated by Python
+            GridLayout:
+                id: account_list_id
+                cols: 2 # Two columns: Name (Label), Balance (TextInput)
+                size_hint_y: None
+                height: self.minimum_height # Adjust height to content
+                spacing: dp(5)
+                padding: [0, dp(5)] # Padding below header
+
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: None
+            height: dp(100) # Fixed height for button area
+            spacing: dp(5)
+
+            # Label to show snapshot status message
+            Label:
+                id: snapshot_status_id
+                text: 'Enter current balances above.'
+                size_hint_y: None
+                height: dp(40)
+
+            Button:
+                text: 'Create New Snapshot'
+                size_hint_y: None
+                height: dp(50)
+                on_press: root.create_new_snapshot() # Call Python method
+
+        Button:
+            text: 'Go to Budget/Transactions'
+            size_hint_y: None
+            height: dp(50)
+            on_press: app.root.current = 'budget' # Switch screen
+
+<BudgetScreen>:
+    # Give the ObjectProperty in Python access to this Label
+    transaction_list_label: transaction_list_id
+
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(10)
+        spacing: dp(10)
+
+        Label:
+            text: 'Budget & Transactions'
+            font_size: '24sp'
+            size_hint_y: None
+            height: dp(40)
+
+        Label:
+            text: '(Budget summary placeholder - e.g., Category | Budgeted | Spent)'
+            size_hint_y: None
+            height: dp(50) # Adjust as needed
+
+        Button:
+            text: 'Import Transactions (CSV)'
+            size_hint_y: None
+            height: dp(50)
+            on_press: root.show_import_dialog() # Call Python method
+
+        ScrollView:
+            size_hint_y: 0.6 # Give more space to transaction list
+            # Placeholder for transaction list
+            Label:
+                id: transaction_list_id
+                text: 'Transactions will appear here after import.\n(Need categorization controls per item)'
+                size_hint_y: None
+                height: self.texture_size[1] # Adjust height to content
+                padding: dp(10)
+
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            Button:
+                text: 'Go to Accounts'
+                size_hint_y: None
+                height: dp(50)
+                on_press: app.root.current = 'accounts' # Switch screen
+
+# --- Define any Popups needed (optional, can also be done purely in Python) ---
+# Example if you wanted to define the file chooser popup structure here
+#<FileChooserPopup@Popup>:
+#    title: "Import CSV File"
+#    size_hint: (0.9, 0.9)
+#    # ... Add content structure (BoxLayout, FileChooser, Buttons) ...
