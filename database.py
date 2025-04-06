@@ -1,15 +1,25 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date, ForeignKey, DateTime
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Float,
+    Date,
+    ForeignKey,
+    DateTime,
+)
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
-from sqlalchemy.sql import func # For default timestamp
+from sqlalchemy.sql import func  # For default timestamp
 
 # --- Database Setup ---
-DATABASE_URL = "sqlite:///budget.db" # Creates budget.db in the same directory
+DATABASE_URL = "sqlite:///budget.db"  # Creates budget.db in the same directory
 
 # create_engine is the starting point for any SQLAlchemy application.
 # connect_args is needed for SQLite to enforce foreign key constraints.
 engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False} # Needed for SQLite threading
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},  # Needed for SQLite threading
 )
 
 # SessionLocal instances will be the actual database session handles.
@@ -19,6 +29,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # --- Data Models (Tables) ---
+
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -37,15 +48,22 @@ class Account(Base):
     def __repr__(self):
         return f"<Account(id={self.id}, name='{self.name}')>"
 
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date, nullable=False, index=True)
     description = Column(String, nullable=False)
-    amount = Column(Float, nullable=False) # Use negative for expenses, positive for income
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True, index=True) # Link to Category
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True) # Link to Account
+    amount = Column(
+        Float, nullable=False
+    )  # Use negative for expenses, positive for income
+    category_id = Column(
+        Integer, ForeignKey("categories.id"), nullable=True, index=True
+    )  # Link to Category
+    account_id = Column(
+        Integer, ForeignKey("accounts.id"), nullable=False, index=True
+    )  # Link to Account
     notes = Column(String, nullable=True)
 
     # Relationships
@@ -54,6 +72,7 @@ class Transaction(Base):
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, date={self.date}, desc='{self.description[:20]}', amount={self.amount})>"
+
 
 class Category(Base):
     __tablename__ = "categories"
@@ -68,22 +87,30 @@ class Category(Base):
     def __repr__(self):
         return f"<Category(id={self.id}, name='{self.name}')>"
 
+
 class Snapshot(Base):
     __tablename__ = "snapshots"
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    timestamp = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
     notes = Column(String, nullable=True)
 
     # Relationship: A snapshot consists of multiple entries (one per account)
-    entries = relationship("SnapshotEntry", back_populates="snapshot", cascade="all, delete-orphan")
+    entries = relationship(
+        "SnapshotEntry", back_populates="snapshot", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Snapshot(id={self.id}, timestamp='{self.timestamp}')>"
 
+
 class SnapshotEntry(Base):
     __tablename__ = "snapshot_entries"
     id = Column(Integer, primary_key=True, index=True)
-    snapshot_id = Column(Integer, ForeignKey("snapshots.id"), nullable=False, index=True)
+    snapshot_id = Column(
+        Integer, ForeignKey("snapshots.id"), nullable=False, index=True
+    )
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
     balance = Column(Float, nullable=False)
 
@@ -106,7 +133,9 @@ def init_db():
         # Add default data if tables are empty or missing defaults
         with SessionLocal() as db:
             # Ensure default category exists
-            uncategorized_exists = db.query(Category).filter(Category.name == "Uncategorized").count() > 0
+            uncategorized_exists = (
+                db.query(Category).filter(Category.name == "Uncategorized").count() > 0
+            )
             if not uncategorized_exists:
                 print("Adding default 'Uncategorized' category...")
                 default_cat = Category(name="Uncategorized")
@@ -116,7 +145,9 @@ def init_db():
             default_account_names = ["Cash", "Checking", "Savings", "Brokerage"]
             added_accounts = False
             for acc_name in default_account_names:
-                account_exists = db.query(Account).filter(Account.name == acc_name).count() > 0
+                account_exists = (
+                    db.query(Account).filter(Account.name == acc_name).count() > 0
+                )
                 if not account_exists:
                     print(f"Adding default account: '{acc_name}'...")
                     default_acc = Account(name=acc_name)
@@ -132,7 +163,8 @@ def init_db():
     except Exception as e:
         print(f"Error during database initialization: {e}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # This allows running 'python database.py' to create the DB schema
     print("Running database setup directly...")
     init_db()
