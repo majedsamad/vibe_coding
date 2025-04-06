@@ -1,5 +1,8 @@
 # budget.kv
 #:import dp kivy.metrics.dp
+#:import Factory kivy.factory.Factory
+#:import RecycleDataViewBehavior kivy.uix.recycleview.views.RecycleDataViewBehavior
+#:import BooleanProperty kivy.properties.BooleanProperty
 
 # Define a simple TextInput for numeric input (basic version)
 <NumericInput@TextInput>:
@@ -7,12 +10,88 @@
     multiline: False
     write_tab: False # Important for focus traversal
 
+<AccountListItem>: # Remove @BoxLayout, use the Python class name directly
+    # Properties (account_id, account_name, selected) are now defined in the Python class
+    # on_touch_down is now handled by the Python method
+
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: dp(40)
+
+    canvas.before:
+        Color:
+            # Use the 'selected' property defined in the Python class
+            rgba: (0.3, 0.3, 0.7, 1) if self.selected else (0.1, 0.1, 0.1, 1)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    Label:
+        id: name_label
+        # Use the 'account_name' property defined in the Python class
+        text: root.account_name
+        size_hint_x: 0.8
+
+
 # Define the Screen Manager rule (optional if defined in Python)
 <MyScreenManager>:
     AccountsScreen:
         name: 'accounts'
     BudgetScreen:
         name: 'budget'
+    AccountManagementScreen:
+        name: 'account_management'
+
+<AccountManagementScreen>:
+    name: 'account_management'
+    account_recycle_view: rv_accounts # Link the ObjectProperty to the id
+    status_label: status_label_accounts # Link the ObjectProperty to the id
+
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(10)
+        spacing: dp(10)
+
+        Label:
+            id: status_label_accounts
+            text: "Loading accounts..."
+            size_hint_y: None
+            height: dp(30)
+
+        RecycleView:
+            id: rv_accounts
+            viewclass: 'AccountListItem' # Tells RV what widget to use for each data item
+            data: [] # This will be populated by load_accounts_for_rv in Python
+            scroll_type: ['bars', 'content']
+            bar_width: dp(10)
+            size_hint_y: 0.8
+
+            RecycleBoxLayout:
+                default_size: None, dp(40) # Height of each item
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height # Make the layout scrollable
+                orientation: 'vertical'
+                spacing: dp(2)
+
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(10)
+            Button:
+                text: "Add Account"
+                on_press: root.open_add_account_popup()
+            Button:
+                text: "Edit Selected"
+                on_press: root.open_edit_account_popup() # Calls the Python method
+            Button:
+                text: "Delete Selected"
+                on_press: root.confirm_delete_account() # Calls the Python method
+        Button:
+            text: "Back to Accounts"
+            size_hint_y: None
+            height: dp(40)
+            on_press: app.root.current = 'accounts' # Or your main screen name
 
 <AccountsScreen>:
     # Give Python access to these widgets
@@ -23,6 +102,12 @@
         orientation: 'vertical'
         padding: dp(10)
         spacing: dp(10)
+        
+        Button:
+            text: 'Manage Accounts'
+            size_hint_y: None
+            height: dp(48)
+            on_press: root.manager.current = 'account_management' # Navigate button
 
         Label:
             text: 'Accounts & Balances for Snapshot'
