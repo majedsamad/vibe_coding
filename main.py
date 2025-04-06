@@ -1,21 +1,20 @@
 import os
 import csv # Using standard csv module for this example
 import datetime # To handle dates
-from kivy.uix.boxlayout import BoxLayout
-from kivy.properties import NumericProperty, StringProperty, BooleanProperty
-from kivy.app import App # Needed to access the running app instance
+
 from kivy.app import App
-from kivy.uix.textinput import TextInput
-from kivy.uix.screenmanager import ScreenManager, Screen 
-from kivy.uix.popup import Popup
-from kivy.uix.filechooser import FileChooserListView
-from kivy.properties import ObjectProperty, StringProperty
+from kivy.clock import Clock
+from kivy.factory import Factory
 from kivy.lang import Builder
 from kivy.metrics import dp
+from kivy.properties import NumericProperty, StringProperty, BooleanProperty, ObjectProperty
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
-from kivy.clock import Clock
+from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.label import Label
-from kivy.factory import Factory
+from kivy.uix.popup import Popup
+from kivy.uix.screenmanager import ScreenManager, Screen 
+from kivy.uix.textinput import TextInput
 
 # --- Database Imports ---
 try:
@@ -63,7 +62,6 @@ class AccountListItem(BoxLayout):
 
 # --- Screen Definitions ---
 
-# --- Add this near other Screen definitions ---
 class AccountManagementScreen(Screen):
     account_recycle_view = ObjectProperty(None) # To hold the RecycleView
     status_label = ObjectProperty(None)        # For messages

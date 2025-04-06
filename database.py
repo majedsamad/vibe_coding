@@ -2,7 +2,6 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, ForeignKey, DateTime
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from sqlalchemy.sql import func # For default timestamp
-import datetime
 
 # --- Database Setup ---
 DATABASE_URL = "sqlite:///budget.db" # Creates budget.db in the same directory
