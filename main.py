@@ -3,8 +3,8 @@ from kivy.uix.screenmanager import ScreenManager
 
 from database import init_db
 
-from account_management import AccountManagementScreen
-from category_management import CategoryManagementScreen
+from account_management_screen import AccountManagementScreen
+from category_management_screen import CategoryManagementScreen
 from account_screen import AccountsScreen
 from budget_screen import BudgetScreen
 
