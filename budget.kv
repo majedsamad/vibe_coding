@@ -1,8 +1,10 @@
-# budget.kv
+#:kivy 2.1.0
 #:import dp kivy.metrics.dp
 #:import Factory kivy.factory.Factory
 #:import RecycleDataViewBehavior kivy.uix.recycleview.views.RecycleDataViewBehavior
 #:import BooleanProperty kivy.properties.BooleanProperty
+
+#:import AccountManagementScreen account_management.AccountManagementScreen
 
 # Define a simple TextInput for numeric input (basic version)
 <NumericInput@TextInput>:
@@ -32,6 +34,26 @@
         text: root.account_name
         size_hint_x: 0.8
 
+<CategoryListItem>:
+    # Properties (category_id, category_name, selected) will be in the Python class
+    # on_touch_down handled by Python method
+
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: dp(40)
+
+    canvas.before:
+        Color:
+            rgba: (0.3, 0.7, 0.3, 1) if self.selected else (0.1, 0.1, 0.1, 1) # Different highlight color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    Label:
+        id: name_label_cat # Use a different id if needed, though not strictly necessary here
+        # Use the 'category_name' property defined in the Python class
+        text: root.category_name
+        size_hint_x: 0.8 # Let name take most space
 
 # Define the Screen Manager rule (optional if defined in Python)
 <MyScreenManager>:
@@ -41,6 +63,8 @@
         name: 'budget'
     AccountManagementScreen:
         name: 'account_management'
+    CategoryManagementScreen:
+        name: 'category_management'
 
 <AccountManagementScreen>:
     name: 'account_management'
@@ -93,6 +117,57 @@
             height: dp(40)
             on_press: app.root.current = 'accounts' # Or your main screen name
 
+<CategoryManagementScreen>:
+    name: 'category_management'
+    category_recycle_view: rv_categories # Link ObjectProperty
+    status_label: status_label_categories # Link ObjectProperty
+ 
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(10)
+        spacing: dp(10)
+ 
+        Label:
+            id: status_label_categories
+            text: "Loading categories..."
+            size_hint_y: None
+            height: dp(30)
+ 
+        RecycleView:
+            id: rv_categories
+            viewclass: 'CategoryListItem' # Use the new list item widget
+            data: [] # Will be populated by Python
+            scroll_type: ['bars', 'content']
+            bar_width: dp(10)
+            size_hint_y: 0.8
+ 
+            RecycleBoxLayout:
+                default_size: None, dp(40) # Height of each item
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height # Make the layout scrollable
+                orientation: 'vertical'
+                spacing: dp(2)
+ 
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(10)
+            Button:
+                text: "Add Category"
+                on_press: root.open_add_category_popup() # Calls new Python method
+            Button:
+                text: "Edit Selected"
+                on_press: root.open_edit_category_popup() # Calls new Python method
+            Button:
+                text: "Delete Selected"
+                on_press: root.confirm_delete_category() # Calls new Python method
+        Button:
+            text: "Back to Accounts" # Or wherever makes sense to navigate back to
+            size_hint_y: None
+            height: dp(40)
+            on_press: app.root.current = 'accounts'
+
 <AccountsScreen>:
     # Give Python access to these widgets
     snapshot_status_label: snapshot_status_id
@@ -103,11 +178,19 @@
         padding: dp(10)
         spacing: dp(10)
         
-        Button:
-            text: 'Manage Accounts'
+        BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
             height: dp(48)
-            on_press: root.manager.current = 'account_management' # Navigate button
+            spacing: dp(10) # Space between buttons
+            Button:
+                text: 'Manage Accounts'
+                # size_hint_x: 0.5 # Uncomment if you want them exactly equal width
+                on_press: root.manager.current = 'account_management' # Navigate button
+            Button:
+                text: 'Manage Categories'
+                # size_hint_x: 0.5 # Uncomment if you want them exactly equal width
+                on_press: root.manager.current = 'category_management' # Navigate button
 
         Label:
             text: 'Accounts & Balances for Snapshot'
