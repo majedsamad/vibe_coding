@@ -320,16 +320,16 @@ class AccountManagementScreen(Screen):
         )
 
         # --- Check dependencies FIRST ---
-        dependency_text = self.check_account_dependencies(account_id)
+        blocking_dependency_text = self.check_account_dependencies(account_id)
 
         try:  # Add error handling
             content = BoxLayout(orientation="vertical", padding=dp(10), spacing=dp(10))
             popup = None  # Define popup variable
 
-            if dependency_text:
+            if blocking_dependency_text:
                 # If dependencies exist, show warning and only an OK button
                 warning_label = Label(
-                    text=f"Cannot delete '{account_name}':\n{dependency_text}",
+                    text=f"Cannot delete '{account_name}':\n{blocking_dependency_text}",
                     halign="center",
                 )
                 ok_button = Button(text="OK", size_hint_y=None, height=dp(50))
@@ -341,10 +341,23 @@ class AccountManagementScreen(Screen):
                 ok_button.bind(on_press=popup.dismiss)
             else:
                 # No dependencies, show confirmation
-                confirm_label = Label(
-                    text=f"Are you sure you want to delete account '{account_name}'?\nThis action cannot be undone.",
-                    halign="center",
-                )
+                snapshot_count = 0
+                try:
+                    with SessionLocal() as db_check:
+                        snapshot_count = (
+                            db_check.query(SnapshotEntry)
+                            .filter(SnapshotEntry.account_id == account_id)
+                            .count()
+                        )
+                except Exception as e_snap:
+                    print(f"Error checking snapshot count for account {account_id}: {e_snap}")
+
+                confirm_message = f"Are you sure you want to delete account '{account_name}'?\nThis action cannot be undone."
+                if snapshot_count > 0:
+                    # Add specific warning about snapshot deletion
+                    confirm_message += f"\n\nWARNING: This will also delete {snapshot_count} associated balance snapshot(s)."
+
+                confirm_label = Label(text=confirm_message, halign="center")
                 button_box = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
                 delete_button = Button(
                     text="Delete", background_color=(1, 0, 0, 1)
@@ -355,20 +368,21 @@ class AccountManagementScreen(Screen):
                 content.add_widget(confirm_label)
                 content.add_widget(button_box)
 
+                # Adjust size hint for potentially longer message
                 popup = Popup(
-                    title="Confirm Deletion", content=content, size_hint=(0.7, 0.4)
+                    title="Confirm Deletion", content=content, size_hint=(0.8, 0.5)
                 )
 
                 def delete_action(instance):
-                    self.delete_account(account_id)  # Call the actual delete method
+                    self.delete_account(account_id) # Call the actual delete method
                     popup.dismiss()
 
                 delete_button.bind(on_press=delete_action)
                 cancel_button.bind(on_press=popup.dismiss)
 
-            if popup:  # Check if popup was created
+            if popup: # Check if popup was created
                 popup.open()
-            else:  # Should not happen unless dependency check failed weirdly
+            else: # Should not happen unless dependency check failed weirdly
                 raise Exception("Popup creation failed unexpectedly.")
 
         except Exception as e:
@@ -378,29 +392,33 @@ class AccountManagementScreen(Screen):
 
     # check_account_dependencies (Add this method if it's missing or incomplete)
     def check_account_dependencies(self, account_id):
-        """Checks if an account has linked transactions or snapshot entries. Returns warning text or None."""
+        """
+        Checks if an account has linked transactions (blocking).
+        Returns:
+            - Warning text if transactions exist (blocking deletion).
+            - None if no transactions exist (deletion allowed, snapshots will be cascaded).
+            - Error string if a database error occurs during check.
+        """
         try:
             with SessionLocal() as db:
+                # Only check for transactions as they are the only blocking dependency now
                 transaction_count = (
                     db.query(Transaction)
                     .filter(Transaction.account_id == account_id)
                     .count()
                 )
-                snapshot_count = (
-                    db.query(SnapshotEntry)
-                    .filter(SnapshotEntry.account_id == account_id)
-                    .count()
-                )
-                warnings = []
-                if transaction_count > 0:
-                    warnings.append(f"{transaction_count} linked transaction(s)")
-                if snapshot_count > 0:
-                    warnings.append(f"{snapshot_count} linked snapshot entry(s)")
 
-                return "\n".join(warnings) if warnings else None
+                if transaction_count > 0:
+                    # Return the specific blocking warning
+                    return f"{transaction_count} linked transaction(s)"
+
+                # If no transactions, return None to indicate deletion is allowed
+                # The confirmation dialog will handle checking/warning about snapshots.
+                return None
         except Exception as e:
             print(f"Error checking dependencies for account {account_id}: {e}")
-            return f"Error checking dependencies: {e}"  # Return error string
+            # Return an error string, which will implicitly block deletion in the calling function
+            return f"Error checking dependencies: {e}"
 
     def delete_account(self, account_id):
         # Dependency check should be done *before* calling this method (in confirm_delete_account)

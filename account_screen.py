@@ -4,6 +4,8 @@ from kivy.uix.label import Label
 from kivy.factory import Factory
 from kivy.metrics import dp
 from kivy.clock import Clock
+from sqlalchemy import desc # Import desc for ordering
+from sqlalchemy.orm import joinedload # For efficient querying
 
 from database import SessionLocal, Account, Snapshot, SnapshotEntry
 
@@ -16,6 +18,9 @@ class AccountsScreen(Screen):
         super().__init__(**kwargs)
         # Dictionary to store references: {account_id: balance_input_widget}
         self.account_inputs = {}
+        # --- NEW: Dictionary to store references to last balance labels ---
+        # {account_id: last_balance_label_widget}
+        self.last_balance_labels = {}
 
     def on_enter(self, *args):
         """Called when the screen is displayed. Schedule the UI setup."""
@@ -38,64 +43,88 @@ class AccountsScreen(Screen):
         self.load_accounts_ui()  # Now load the accounts
 
     def load_accounts_ui(self):
-        """Queries DB for accounts and populates the GridLayout."""
-        # Ensure layout is ready (should be by the time _setup_ui calls this)
+        """Queries DB for accounts, finds the latest snapshot balance for each,
+           and populates the GridLayout, storing label references."""
         if not self.account_list_layout:
-            print("Error: Account list layout not ready in load_accounts_ui.")
-            # Attempting to access self.snapshot_status_label here might also fail if layout isn't ready
-            # If snapshot_status_label is available, use it for error message:
-            if self.snapshot_status_label:
-                self.snapshot_status_label.text = "Internal Error: UI layout missing."
+            print("Error: Account list layout not ready.")
+            # ... (error handling) ...
             return
 
-        # Clear existing widgets before adding new ones
+        # --- Clear label references BEFORE clearing widgets ---
+        self.account_inputs.clear()
+        self.last_balance_labels.clear() # Clear the label refs too
         self.account_list_layout.clear_widgets()
-        self.account_inputs.clear()  # Clear the references as well
+
+
+        latest_balances = {}
 
         try:
             with SessionLocal() as db:
+                # ... (Querying accounts and latest balances remains the same) ...
                 accounts = db.query(Account).order_by(Account.name).all()
-
                 if not accounts:
-                    self.account_list_layout.add_widget(
-                        Label(text="No accounts found in database.")
-                    )
+                    self.snapshot_status_label.text = "No accounts found. Add accounts in 'Manage Accounts'."
                     return
 
-                # Dynamically create Label and TextInput for each account
+                account_ids = [acc.id for acc in accounts]
+                # ... (Query and process all_entries to populate latest_balances) ...
+                all_entries = (
+                     db.query(SnapshotEntry)
+                     .options(joinedload(SnapshotEntry.snapshot))
+                     .filter(SnapshotEntry.account_id.in_(account_ids))
+                     .join(SnapshotEntry.snapshot)
+                     .order_by(SnapshotEntry.account_id, Snapshot.timestamp.desc())
+                     .all()
+                 )
+                processed_accounts = set()
+                for entry in all_entries:
+                    if entry.account_id not in processed_accounts:
+                        latest_balances[entry.account_id] = entry.balance
+                        processed_accounts.add(entry.account_id)
+
+
+                # 3. Populate the UI
                 for account in accounts:
-                    # Account Name Label
+                    last_balance = latest_balances.get(account.id)
+                    last_balance_str = f"{last_balance:.2f}" if last_balance is not None else "N/A"
+
+                    # --- Column 1: Account Name ---
                     name_label = Label(
-                        text=account.name,
-                        size_hint_y=None,
-                        height=dp(40),
-                        halign="left",
-                        valign="middle",
-                        text_size=(
-                            self.width * 0.5,
-                            None,
-                        ),  # Adjust width constraint if needed
+                        text=account.name, size_hint_y=None, height=dp(40),
+                        halign="left", valign="middle", size_hint_x=0.40
                     )
+                    name_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
                     self.account_list_layout.add_widget(name_label)
 
-                    # Balance Input TextInput (using the custom NumericInput from kv)
-                    balance_input = (
-                        Factory.NumericInput(  # Use Factory to create kv defined class
-                            hint_text="0.00",
-                            size_hint_y=None,
-                            height=dp(40),
-                            size_hint_x=0.4,  # Match kv layout if needed
-                        )
+                    # --- Column 2: Last Snapshot Balance ---
+                    last_balance_label = Label(
+                        text=last_balance_str, size_hint_y=None, height=dp(40),
+                        halign="right", valign="middle", color=(0.8, 0.8, 0.8, 1),
+                        size_hint_x=0.25
+                    )
+                    last_balance_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
+                    self.account_list_layout.add_widget(last_balance_label)
+                    # --- STORE REFERENCE to the label ---
+                    self.last_balance_labels[account.id] = last_balance_label
+
+
+                    # --- Column 3: Current Balance Input ---
+                    balance_input = Factory.NumericInput(
+                        hint_text="0.00", size_hint_y=None, height=dp(40),
+                        halign="right", size_hint_x=0.35
                     )
                     self.account_list_layout.add_widget(balance_input)
-
-                    # Store the reference to the input widget, keyed by account ID
-                    self.account_inputs[account.id] = balance_input
+                    # Store reference to the input widget
+                    self.account_inputs[account.id] = balance_input # Keep this too
 
         except Exception as e:
+            # ... (error handling) ...
             self.snapshot_status_label.text = f"Error loading accounts: {e}"
             print(f"Database error loading accounts: {e}")
+            self.account_list_layout.clear_widgets()
+            self.account_list_layout.add_widget(Label(text="Error loading. Check logs."))
 
+    # --- MODIFIED: create_new_snapshot ---
     def create_new_snapshot(self):
         if not self.account_inputs:
             self.snapshot_status_label.text = "No accounts loaded or inputs available."
@@ -103,72 +132,76 @@ class AccountsScreen(Screen):
 
         print("Create Snapshot button pressed - Reading balances from inputs")
 
-        current_balances = {}
+        current_balances = {} # Holds {acc_id: balance_float} from inputs
         errors = []
-        # Read balances from the TextInput widgets stored in self.account_inputs
         for acc_id, input_widget in self.account_inputs.items():
             balance_str = input_widget.text.strip()
             try:
-                # Use 0.0 if input is empty, otherwise convert to float
                 balance = float(balance_str) if balance_str else 0.0
                 current_balances[acc_id] = balance
             except ValueError:
-                # Handle cases where input is not a valid number
                 errors.append(
                     f"Invalid balance for account ID {acc_id}: '{balance_str}'. Using 0.0."
                 )
-                current_balances[acc_id] = 0.0  # Default to 0 on error
+                current_balances[acc_id] = 0.0
 
         if errors:
             print("Input errors found:\n" + "\n".join(errors))
-            # Optionally show a more prominent error to the user
-            # self.snapshot_status_label.text = "Warning: Invalid balance input detected. Used 0.0."
-            # return # Or decide to proceed with 0.0 values
+            # Optionally update status label more prominently here
 
-        # Proceed with creating the snapshot using the collected balances
+        # Proceed with creating the snapshot
         try:
             with SessionLocal() as db:
-                # Check if we actually have accounts associated with the inputs
                 account_ids = list(current_balances.keys())
                 if not account_ids:
                     self.snapshot_status_label.text = "No account balances entered."
                     return
 
-                # Verify accounts still exist (optional, good practice)
-                accounts_in_db = (
-                    db.query(Account.id).filter(Account.id.in_(account_ids)).count()
-                )
+                # Optional: Verify accounts still exist
+                accounts_in_db = db.query(Account.id).filter(Account.id.in_(account_ids)).count()
                 if accounts_in_db != len(account_ids):
-                    self.snapshot_status_label.text = (
-                        "Error: Some accounts seem missing. Reloading."
-                    )
+                    self.snapshot_status_label.text = "Error: Account mismatch. Reloading UI."
                     print("Account mismatch detected, reloading UI.")
-                    self.load_accounts_ui()  # Reload might fix inconsistencies
+                    self.load_accounts_ui() # Reload might fix inconsistencies
                     return
 
                 # Create the Snapshot record
-                new_snapshot = Snapshot(
-                    notes="Manual Snapshot via UI"
-                )  # Timestamp added automatically
+                new_snapshot = Snapshot(notes="Manual Snapshot via UI")
                 db.add(new_snapshot)
-                db.flush()  # Get the new_snapshot.id
+                db.flush() # Get the new_snapshot.id
 
-                # Create SnapshotEntry records for each account balance
+                # Create SnapshotEntry records
                 for acc_id, bal in current_balances.items():
                     entry = SnapshotEntry(
                         snapshot_id=new_snapshot.id, account_id=acc_id, balance=bal
                     )
                     db.add(entry)
 
-                db.commit()
+                db.commit() # Commit snapshot and entries
                 timestamp_str = new_snapshot.timestamp.strftime("%Y-%m-%d %H:%M:%S")
                 status_msg = f"Snapshot created at {timestamp_str} with {len(current_balances)} entries."
                 if errors:
                     status_msg += "\nNote: Some invalid balances were set to 0.0."
+
                 self.snapshot_status_label.text = status_msg
                 print(f"Snapshot ID: {new_snapshot.id} created.")
+
+                # --- NEW: Update the 'Last Balance' labels in the UI ---
+                print("Updating UI labels with new snapshot balances...")
+                for acc_id, new_balance in current_balances.items():
+                    if acc_id in self.last_balance_labels:
+                        # Format the new balance and update the corresponding label's text
+                        self.last_balance_labels[acc_id].text = f"{new_balance:.2f}"
+                    else:
+                        # Should not happen if UI is loaded correctly, but log if it does
+                        print(f"Warning: Could not find last balance label for account ID {acc_id} to update.")
+
+                # --- Optional: Clear the input fields after successful snapshot ---
+                # print("Clearing input fields...")
+                # for input_widget in self.account_inputs.values():
+                #     input_widget.text = ""
 
         except Exception as e:
             self.snapshot_status_label.text = f"Error saving snapshot: {e}"
             print(f"Database error during snapshot save: {e}")
-            # Consider db.rollback() - handled by 'with SessionLocal()' context manager
+            # Rollback handled by context manager

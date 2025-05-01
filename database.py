@@ -42,7 +42,7 @@ class Account(Base):
     # Relationship: An account can have many transactions
     transactions = relationship("Transaction", back_populates="account")
     # Relationship: An account can have many snapshot entries
-    snapshots = relationship("SnapshotEntry", back_populates="account")
+    snapshots = relationship("SnapshotEntry", back_populates="account", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Account(id={self.id}, name='{self.name}')>"
@@ -123,15 +123,17 @@ class SnapshotEntry(Base):
 
 # --- Utility Function ---
 def init_db():
-    """Creates database tables if they don't exist and adds default data."""
+    """Creates database tables if they don't exist and adds default data conditionally."""
     print("Initializing database...")
     try:
+        # Ensure all tables defined in Base are created if they don't exist
         Base.metadata.create_all(bind=engine)
         print("Database tables checked/created.")
 
-        # Add default data if tables are empty or missing defaults
+        # Use a session to check and potentially add default data
         with SessionLocal() as db:
-            # Ensure default category exists
+            # --- 1. Ensure default category exists (usually always needed) ---
+            uncategorized_added = False
             uncategorized_exists = (
                 db.query(Category).filter(Category.name == "Uncategorized").count() > 0
             )
@@ -139,28 +141,41 @@ def init_db():
                 print("Adding default 'Uncategorized' category...")
                 default_cat = Category(name="Uncategorized")
                 db.add(default_cat)
+                uncategorized_added = True # Mark that we added it
 
-            # Ensure default accounts exist
-            default_account_names = ["Cash", "Checking", "Savings", "Brokerage"]
-            added_accounts = False
-            for acc_name in default_account_names:
-                account_exists = (
-                    db.query(Account).filter(Account.name == acc_name).count() > 0
-                )
-                if not account_exists:
+            # --- 2. Check if ANY accounts exist ---
+            total_account_count = db.query(Account).count()
+            defaults_added = False # Flag to track if we add defaults in this run
+
+            # --- 3. Add default accounts ONLY if NO accounts exist ---
+            if total_account_count == 0:
+                print("No accounts found. Adding default accounts...")
+                default_account_names = ["Cash", "Checking", "Savings", "Brokerage"]
+                for acc_name in default_account_names:
+                    # Since we know the table is empty, no need for individual checks
                     print(f"Adding default account: '{acc_name}'...")
                     default_acc = Account(name=acc_name)
                     db.add(default_acc)
-                    added_accounts = True
+                defaults_added = True # Mark that we added the block of defaults
+            else:
+                # If accounts already exist, skip adding defaults
+                print(f"Found {total_account_count} existing account(s). Skipping default account creation.")
 
-            if not uncategorized_exists or added_accounts:
+            # --- 4. Commit if any changes were made ---
+            if uncategorized_added or defaults_added:
                 db.commit()
                 print("Default data checked/added.")
             else:
-                print("Default category and accounts already exist.")
+                # Provide feedback if nothing was added
+                if uncategorized_exists and total_account_count > 0:
+                    print("Default category and existing accounts found. No default data added.")
+                elif uncategorized_exists:
+                     print("Default category found. No default accounts added (table was empty).") # Should not happen with current logic but safe
+                # Add other conditions if needed
 
     except Exception as e:
         print(f"Error during database initialization: {e}")
+        # Rollback might be needed if error occurred mid-session, but context manager handles it
 
 
 if __name__ == "__main__":
