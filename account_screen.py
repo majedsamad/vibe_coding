@@ -1,3 +1,4 @@
+from datetime import date # Import date
 from kivy.uix.screenmanager import Screen
 from kivy.properties import ObjectProperty
 from kivy.uix.label import Label
@@ -54,12 +55,60 @@ class AccountsScreen(Screen):
         self.last_balance_labels.clear() # Clear the label refs too
         self.account_list_layout.clear_widgets()
 
+        # Define column proportions, matching KV headers
+        col_hint_name = 0.40
+        col_hint_last_bal = 0.25
+        col_hint_curr_bal = 0.35
 
         latest_balances = {}
+        latest_snapshot_date_str = "N/A"
+        today_date_str = date.today().strftime("%Y-%m-%d")
 
         try:
             with SessionLocal() as db:
-                # ... (Querying accounts and latest balances remains the same) ...
+                # Get the date of the most recent snapshot with entries
+                latest_snapshot_with_entries = db.query(Snapshot).\
+                    join(SnapshotEntry, Snapshot.id == SnapshotEntry.snapshot_id).\
+                    order_by(Snapshot.timestamp.desc()).first()
+
+                if latest_snapshot_with_entries:
+                    latest_snapshot_date_str = latest_snapshot_with_entries.timestamp.strftime("%Y-%m-%d")
+
+                # --- Add row for "Date of Displayed Snapshot" ---
+                # Empty cell under "Account Name"
+                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_name))
+                # Date cell under "Last Balance"
+                snapshot_date_label = Label(
+                    text=f"Snapshot Date: {latest_snapshot_date_str}",
+                    size_hint_y=None, height=dp(30), halign="right", valign="middle",
+                    size_hint_x=col_hint_last_bal, color=(0.9, 0.9, 0.9, 1) # Brighter text
+                )
+                snapshot_date_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
+                self.account_list_layout.add_widget(snapshot_date_label)
+                # Empty cell under "Current Balance"
+                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_curr_bal))
+
+                # --- Add row for "Date for New Snapshot (Today)" ---
+                # Empty cell under "Account Name"
+                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_name))
+                # Empty cell under "Last Balance"
+                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_last_bal))
+                # Date cell under "Current Balance"
+                today_date_display_label = Label(
+                    text=f"New Snapshot Date: {today_date_str}",
+                    size_hint_y=None, height=dp(30), halign="right", valign="middle",
+                    size_hint_x=col_hint_curr_bal, color=(0.9, 0.9, 0.9, 1) # Brighter text
+                )
+                today_date_display_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
+                self.account_list_layout.add_widget(today_date_display_label)
+                
+                # Optional: Add a small separator row (e.g., an empty label with minimal height or a specific widget)
+                # self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(5), size_hint_x=1)) # Spans all 3 cols implicitly due to GridLayout
+                # self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(5), size_hint_x=1))
+                # self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(5), size_hint_x=1))
+
+
+                # Query accounts (original logic)
                 accounts = db.query(Account).order_by(Account.name).all()
                 if not accounts:
                     self.snapshot_status_label.text = "No accounts found. Add accounts in 'Manage Accounts'."
@@ -90,7 +139,7 @@ class AccountsScreen(Screen):
                     # --- Column 1: Account Name ---
                     name_label = Label(
                         text=account.name, size_hint_y=None, height=dp(40),
-                        halign="left", valign="middle", size_hint_x=0.40
+                        halign="left", valign="middle", size_hint_x=col_hint_name
                     )
                     name_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
                     self.account_list_layout.add_widget(name_label)
@@ -99,22 +148,20 @@ class AccountsScreen(Screen):
                     last_balance_label = Label(
                         text=last_balance_str, size_hint_y=None, height=dp(40),
                         halign="right", valign="middle", color=(0.8, 0.8, 0.8, 1),
-                        size_hint_x=0.25
+                        size_hint_x=col_hint_last_bal
                     )
                     last_balance_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
                     self.account_list_layout.add_widget(last_balance_label)
-                    # --- STORE REFERENCE to the label ---
                     self.last_balance_labels[account.id] = last_balance_label
 
 
                     # --- Column 3: Current Balance Input ---
                     balance_input = Factory.NumericInput(
                         hint_text="0.00", size_hint_y=None, height=dp(40),
-                        halign="right", size_hint_x=0.35
+                        halign="right", size_hint_x=col_hint_curr_bal
                     )
                     self.account_list_layout.add_widget(balance_input)
-                    # Store reference to the input widget
-                    self.account_inputs[account.id] = balance_input # Keep this too
+                    self.account_inputs[account.id] = balance_input
 
         except Exception as e:
             # ... (error handling) ...
@@ -185,13 +232,12 @@ class AccountsScreen(Screen):
                 self.snapshot_status_label.text = status_msg
                 print(f"Snapshot ID: {new_snapshot.id} created.")
 
-                # --- NEW: Update the 'Last Balance' labels in the UI ---
-                print("Updating UI labels with new snapshot balances...")
-                for acc_id, new_balance in current_balances.items():
-                    if acc_id in self.last_balance_labels:
-                        self.last_balance_labels[acc_id].text = f"{new_balance:.2f}"
-                    else:
-                        print(f"Warning: Could not find last balance label for account ID {acc_id} to update.")
+                # Reload the UI to show the new snapshot date and balances
+                self.load_accounts_ui()
+                # Clear inputs after successful snapshot
+                for input_widget in self.account_inputs.values():
+                    input_widget.text = ""
+
 
         except Exception as e:
             self.snapshot_status_label.text = f"Error saving snapshot: {e}"
