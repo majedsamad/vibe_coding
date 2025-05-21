@@ -163,83 +163,105 @@
             on_press: app.root.current = 'accounts'
 
 <AccountsScreen>:
-    # Give Python access to these widgets
     snapshot_status_label: snapshot_status_id
-    account_list_layout: account_list_id # ID for the GridLayout
+    account_list_layout: account_list_id
 
-    BoxLayout:
+    BoxLayout: # Main vertical layout
         orientation: 'vertical'
         padding: dp(10)
         spacing: dp(10)
-        
+
+        # --- Top Navigation Buttons (Keep this structure) ---
         BoxLayout:
             orientation: 'horizontal'
             size_hint_y: None
             height: dp(48)
-            spacing: dp(10) # Space between buttons
+            spacing: dp(10)
             Button:
                 text: 'Manage Accounts'
-                # size_hint_x: 0.5 # Uncomment if you want them exactly equal width
-                on_press: root.manager.current = 'account_management' # Navigate button
+                on_press: root.manager.current = 'account_management'
             Button:
                 text: 'Manage Categories'
-                # size_hint_x: 0.5 # Uncomment if you want them exactly equal width
-                on_press: root.manager.current = 'category_management' # Navigate button
+                on_press: root.manager.current = 'category_management'
 
+        # --- Title Label (Keep this) ---
         Label:
             text: 'Accounts & Balances for Snapshot'
             font_size: '24sp'
             size_hint_y: None
             height: dp(40)
 
-        # Header for the account list
+        # --- MODIFIED Header for the account list (3 columns) ---
         BoxLayout:
             size_hint_y: None
-            height: dp(30)
+            height: dp(30) # Keep height consistent
+            padding: [dp(5), 0, dp(5), 0] # Add some horizontal padding if needed
+            spacing: dp(5) # Add spacing between header labels
+
             Label:
                 text: 'Account Name'
                 halign: 'left'
-                text_size: self.size
+                valign: 'middle'
+                text_size: self.width, None # Constrain text wrapping
+                size_hint_x: 0.40 # Allocate ~40% width
+
+            Label: # NEW HEADER LABEL
+                text: 'Last Balance'
+                halign: 'right' # Align right for numbers
+                valign: 'middle'
+                text_size: self.width, None
+                size_hint_x: 0.25 # Allocate ~25% width
+                color: 0.8, 0.8, 0.8, 1 # Dim slightly
+
             Label:
                 text: 'Current Balance'
-                halign: 'right'
-                text_size: self.size
-                size_hint_x: 0.4 # Give balance column less space
+                halign: 'right' # Align right for numbers
+                valign: 'middle'
+                text_size: self.width, None
+                size_hint_x: 0.35 # Allocate ~35% width
 
+        # --- ScrollView containing the GridLayout (Modify cols) ---
         ScrollView:
-            # This GridLayout will be populated by Python
+            # Let ScrollView take the remaining vertical space
+            size_hint_y: 1 # Changed from fixed size to fill space
+            do_scroll_x: False # Prevent horizontal scrolling
+
             GridLayout:
                 id: account_list_id
-                cols: 2 # Two columns: Name (Label), Balance (TextInput)
-                size_hint_y: None
-                height: self.minimum_height # Adjust height to content
+                # --- CHANGE COLS ---
+                cols: 3 # Now 3 columns
+                # --- END CHANGE ---
+                size_hint_y: None # Allow grid to determine its height
+                height: self.minimum_height # Make grid height fit content
                 spacing: dp(5)
-                padding: [0, dp(5)] # Padding below header
+                # Removed padding here, let header handle horizontal padding if needed
 
+        # --- Bottom Section (Status Label and Snapshot Button - Keep Structure) ---
         BoxLayout:
             orientation: 'vertical'
-            size_hint_y: None
-            height: dp(100) # Fixed height for button area
+            size_hint_y: None # Keep this section fixed height
+            height: dp(100) # Maintain original height
             spacing: dp(5)
 
-            # Label to show snapshot status message
             Label:
                 id: snapshot_status_id
-                text: 'Enter current balances above.'
+                text: 'Enter current balances ->' # Updated text hint
                 size_hint_y: None
-                height: dp(40)
+                height: dp(40) # Maintain original height
 
             Button:
                 text: 'Create New Snapshot'
                 size_hint_y: None
-                height: dp(50)
-                on_press: root.create_new_snapshot() # Call Python method
+                height: dp(50) # Maintain original height
+                on_press: root.create_new_snapshot()
 
+        # --- Bottom Navigation Button (Keep this) ---
         Button:
             text: 'Go to Budget/Transactions'
             size_hint_y: None
             height: dp(50)
-            on_press: app.root.current = 'budget' # Switch screen
+            on_press: app.root.current = 'budget'
+
 
 <BudgetScreen>:
     # Give the ObjectProperty in Python access to this Label

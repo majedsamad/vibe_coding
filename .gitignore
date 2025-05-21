@@ -314,3 +314,4 @@ dist/main/_internal/sqlalchemy/cyextension/immutabledict.cpython-39-darwin.so
 dist/main/_internal/sqlalchemy/cyextension/processors.cpython-39-darwin.so
 dist/main/_internal/sqlalchemy/cyextension/resultproxy.cpython-39-darwin.so
 dist/main/_internal/sqlalchemy/cyextension/util.cpython-39-darwin.so
+.aider*

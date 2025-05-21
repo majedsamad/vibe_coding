@@ -4,7 +4,6 @@ from kivy.uix.label import Label
 from kivy.factory import Factory
 from kivy.metrics import dp
 from kivy.clock import Clock
-from sqlalchemy import desc # Import desc for ordering
 from sqlalchemy.orm import joinedload # For efficient querying
 
 from database import SessionLocal, Account, Snapshot, SnapshotEntry
@@ -190,18 +189,10 @@ class AccountsScreen(Screen):
                 print("Updating UI labels with new snapshot balances...")
                 for acc_id, new_balance in current_balances.items():
                     if acc_id in self.last_balance_labels:
-                        # Format the new balance and update the corresponding label's text
                         self.last_balance_labels[acc_id].text = f"{new_balance:.2f}"
                     else:
-                        # Should not happen if UI is loaded correctly, but log if it does
                         print(f"Warning: Could not find last balance label for account ID {acc_id} to update.")
-
-                # --- Optional: Clear the input fields after successful snapshot ---
-                # print("Clearing input fields...")
-                # for input_widget in self.account_inputs.values():
-                #     input_widget.text = ""
 
         except Exception as e:
             self.snapshot_status_label.text = f"Error saving snapshot: {e}"
             print(f"Database error during snapshot save: {e}")
-            # Rollback handled by context manager
