@@ -1,4 +1,4 @@
-from datetime import date # Import date
+from datetime import date, datetime # Import date and datetime
 from kivy.uix.screenmanager import Screen
 from kivy.properties import ObjectProperty
 from kivy.uix.label import Label
@@ -212,7 +212,7 @@ class AccountsScreen(Screen):
                     return
 
                 # Create the Snapshot record
-                new_snapshot = Snapshot(notes="Manual Snapshot via UI")
+                new_snapshot = Snapshot(timestamp=datetime.now(), notes="Manual Snapshot via UI")
                 db.add(new_snapshot)
                 db.flush() # Get the new_snapshot.id
 
