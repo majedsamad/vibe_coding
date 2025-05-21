@@ -74,33 +74,33 @@ class AccountsScreen(Screen):
                 if latest_snapshot_with_entries:
                     latest_snapshot_date_str = latest_snapshot_with_entries.timestamp.strftime("%Y-%m-%d")
 
-                # --- Add row for "Date of Displayed Snapshot" ---
-                # Empty cell under "Account Name"
-                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_name))
-                # Date cell under "Last Balance"
-                snapshot_date_label = Label(
-                    text=f"Snapshot Date: {latest_snapshot_date_str}",
+                # --- Add a single row for Dates ---
+                # Column 1: "Date:" label
+                date_title_label = Label(
+                    text="Date:",
+                    size_hint_y=None, height=dp(30), halign="left", valign="middle",
+                    size_hint_x=col_hint_name, color=(0.9, 0.9, 0.9, 1) # Brighter text
+                )
+                date_title_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
+                self.account_list_layout.add_widget(date_title_label)
+
+                # Column 2: Snapshot Date
+                snapshot_date_val_label = Label(
+                    text=f"Snapshot: {latest_snapshot_date_str}",
                     size_hint_y=None, height=dp(30), halign="right", valign="middle",
                     size_hint_x=col_hint_last_bal, color=(0.9, 0.9, 0.9, 1) # Brighter text
                 )
-                snapshot_date_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
-                self.account_list_layout.add_widget(snapshot_date_label)
-                # Empty cell under "Current Balance"
-                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_curr_bal))
+                snapshot_date_val_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
+                self.account_list_layout.add_widget(snapshot_date_val_label)
 
-                # --- Add row for "Date for New Snapshot (Today)" ---
-                # Empty cell under "Account Name"
-                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_name))
-                # Empty cell under "Last Balance"
-                self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(30), size_hint_x=col_hint_last_bal))
-                # Date cell under "Current Balance"
-                today_date_display_label = Label(
-                    text=f"New Snapshot Date: {today_date_str}",
+                # Column 3: New Snapshot Date (Today)
+                new_snapshot_date_val_label = Label(
+                    text=f"New: {today_date_str}",
                     size_hint_y=None, height=dp(30), halign="right", valign="middle",
                     size_hint_x=col_hint_curr_bal, color=(0.9, 0.9, 0.9, 1) # Brighter text
                 )
-                today_date_display_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
-                self.account_list_layout.add_widget(today_date_display_label)
+                new_snapshot_date_val_label.bind(width=lambda instance, width: setattr(instance, 'text_size', (width, None)))
+                self.account_list_layout.add_widget(new_snapshot_date_val_label)
                 
                 # Optional: Add a small separator row (e.g., an empty label with minimal height or a specific widget)
                 # self.account_list_layout.add_widget(Label(text="", size_hint_y=None, height=dp(5), size_hint_x=1)) # Spans all 3 cols implicitly due to GridLayout
